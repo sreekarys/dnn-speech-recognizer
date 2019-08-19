@@ -136,18 +136,39 @@ def bidirectional_rnn_model(input_dim, units, output_dim=29):
 def final_model():
     """ Build a deep network for speech 
     """
+    #hyperparameters
+    input_length = 161 #spectrogram
+    output_dim = 29
+    filters = 200
+    kernel_size = 11
+    stride = 2
+    padding = 'valid'
+    convolutional_activation = 'relu'
+    recurrent_activation = 'relu'
+    units = 200
+    recurrent_layers = 3
+    
+    #noticed that the model is overfitting the training data, hence using dropout regularization in the RNN.
+    #dropout_U = 0.5
+    #dropout_W = 0.5
+    
+    #With the above values of 0.5 for dropout_U and dropout_W, training loss is not decreasing. After some tuning, foiund that the below values work well and I was able to train without overfitting till 30 epochs 
+    dropout_U = 0.1
+    dropout_W = 0.5
+    
+    
     # Main acoustic input
-    input_data = Input(name='the_input', shape=(None, input_dim))
+    input_data = Input(name='the_input', shape=(None, input_length))
     # TODO: Specify the layers in your network
-    conv_data = Conv1d(200, 11, strides=2, padding='valid',
-                      name='conv', activation='relu')(input_data)
+    conv_data = Conv1D(filters, kernel_size, strides=stride, padding=padding,
+                      name='conv', activation=convolutional_activation)(input_data)
     bn_cnn = BatchNormalization()(conv_data)
     
-    recur_layers = 3
     rnn_data = bn_cnn
-    for i in range(recur_layers):
-        bidir_rnn = Bidirectional(GRU(200, activation='relu', name='bidir_rnn_' + str(i+1),
-                               implementation=2, return_sequences=True))(rnn_data)
+    for i in range(recurrent_layers):
+        bidir_rnn = Bidirectional(GRU(units, activation=recurrent_activation, name='bidir_rnn_' + str(i+1),
+                               implementation=2, return_sequences=True, dropout_U=dropout_U,
+                                      dropout_W=dropout_W))(rnn_data)
         bn_rnn = BatchNormalization()(bidir_rnn)
         rnn_data = bn_rnn
         
@@ -157,6 +178,6 @@ def final_model():
     # Specify the model
     model = Model(inputs=input_data, outputs=y_pred)
     # TODO: Specify model.output_length
-    model.output_length = ...
+    model.output_length = lambda x: cnn_output_length(x, kernel_size, padding, stride)
     print(model.summary())
     return model
